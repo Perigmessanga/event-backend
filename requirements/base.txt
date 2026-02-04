@@ -11,3 +11,7 @@ python-dotenv==1.0.0
 
 # API documentation
 drf-spectacular==0.29.0
+
+# Database
+mysqlclient==2.2.1
+psycopg2-binary==2.9.9  # Alternative: PostgreSQL

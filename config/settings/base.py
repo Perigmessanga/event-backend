@@ -123,9 +123,9 @@ if DB_ENGINE == "mysql":
             "ENGINE": "django.db.backends.mysql",
             "HOST": config("DB_HOST", "127.0.0.1"),
             "PORT": config("DB_PORT", "3306"),
-            "NAME": config("DB_NAME", "chic_transfer_dev"),
-            "USER": config("DB_USER", "chic_user"),
-            "PASSWORD": config("DB_PASSWORD", "chic_password"),
+            "NAME": config("DB_NAME", "events_db"),
+            "USER": config("DB_USER", "events_user"),
+            "PASSWORD": config("DB_PASSWORD", "events_password"),
             "OPTIONS": {
                 "charset": "utf8mb4",
             },
@@ -138,9 +138,9 @@ elif DB_ENGINE == "postgresql":
             "ENGINE": "django.db.backends.postgresql",
             "HOST": config("DB_HOST", "127.0.0.1"),
             "PORT": config("DB_PORT", "5432"),
-            "NAME": config("DB_NAME", "chic_transfer"),
-            "USER": config("DB_USER", "chic_user"),
-            "PASSWORD": config("DB_PASSWORD", "chic_password"),
+            "NAME": config("DB_NAME", "events_db"),
+            "USER": config("DB_USER", "events_user"),
+            "PASSWORD": config("DB_PASSWORD", "events_password"),
         }
     }
 else:
