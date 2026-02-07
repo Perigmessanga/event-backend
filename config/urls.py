@@ -19,6 +19,7 @@ from django.urls import path, include
 from django.http import HttpResponse
 from django.conf import settings
 from django.conf.urls.static import static
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
 
 def home(request):
@@ -28,7 +29,17 @@ def home(request):
 urlpatterns = [
     path('', home),
     path('admin/', admin.site.urls),
+    
+    # API Schema & Documentation
+    path('schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    
+    # API v1
     path('api/v1/', include('apps.authentication.urls')),
+    path('api/v1/', include('apps.events.urls')),
+    path('api/v1/', include('apps.orders.urls')),
+    path('api/v1/', include('apps.payments.urls')),
 ]
 
 if settings.DEBUG:

@@ -9,10 +9,12 @@ django-cors-headers==4.3.1
 python-decouple==3.8
 python-dotenv==1.0.0
 
+# Image handling
+Pillow==10.1.0
 
 # API documentation
 drf-spectacular==0.29.0
 
-# Database
+# Database (uncomment the one you need)
 # mysqlclient==2.2.1
-psycopg2-binary==2.9.11 # Alternative: PostgreSQL
+# psycopg2-binary==2.9.11  # PostgreSQL
