@@ -72,10 +72,7 @@ class ProfileView(APIView):
 
     def get(self, request):
         user_data = UserSerializer(request.user).data
-        return Response({
-            'user': user_data,
-            'message': 'Profile retrieved successfully'
-        }, status=status.HTTP_200_OK)
+        return Response(user_data, status=status.HTTP_200_OK)
 
     def put(self, request):
         """Update user profile"""

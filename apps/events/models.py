@@ -30,21 +30,13 @@ class Event(models.Model):
         return self.title
     
     def get_tickets_sold(self):
-        """Get count of tickets sold for this event"""
+        """Count total tickets sold for this event"""
         from apps.orders.models import Order
         return Order.objects.filter(event=self, status='completed').count()
     
     def get_available_tickets(self):
         """Get available tickets count"""
         return max(0, self.capacity - self.get_tickets_sold())
-    
-    def get_tickets_sold(self):
-        """Count total tickets sold for this event"""
-        from apps.orders.models import Order, OrderStatus
-        return Order.objects.filter(
-            event=self,
-            status__in=[OrderStatus.CONFIRMED, OrderStatus.COMPLETED]
-        ).count()
     
     @property
     def tickets_remaining(self):

@@ -7,6 +7,8 @@ from .models import CustomUser, OTPVerification
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for User model"""
     
+    role = serializers.SerializerMethodField()
+    
     class Meta:
         model = CustomUser
         fields = [
@@ -15,16 +17,22 @@ class UserSerializer(serializers.ModelSerializer):
             'is_email_verified', 'is_phone_verified', 'created_at'
         ]
         read_only_fields = ['id', 'created_at']
+    
+    def get_role(self, obj):
+        """Return 'admin' for superusers, otherwise return their assigned role"""
+        if obj.is_superuser:
+            return 'admin'
+        return obj.role
 
 
 class RegisterSerializer(serializers.ModelSerializer):
     """Serializer for user registration"""
     
-    password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
-    password_confirm = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
+    password = serializers.CharField(write_only=True, required=True, min_length=8)
+    password_confirm = serializers.CharField(write_only=True, required=True, min_length=8)
+    # Accept both camelCase and snake_case
     firstName = serializers.CharField(source='first_name', required=False, allow_blank=True, default='')
     lastName = serializers.CharField(source='last_name', required=False, allow_blank=True, default='')
-    phone = serializers.CharField(required=False, allow_blank=True, default='')
     
     class Meta:
         model = CustomUser
@@ -32,30 +40,31 @@ class RegisterSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'firstName': {'required': False},
             'lastName': {'required': False},
-            'phone': {'required': False},
+            'phone': {'required': False, 'allow_blank': True},
             'username': {'required': False},
         }
     
     def validate_email(self, value):
         """Check if email already exists"""
         if CustomUser.objects.filter(email=value.lower()).exists():
-            raise serializers.ValidationError('This email is already registered.')
+            raise serializers.ValidationError('Cet email est déjà enregistré.')
         return value.lower()
     
-    def validate_phone(self, value):
-        """Allow empty phones, validate non-empty"""
-        if not value or value.strip() == '':
-            return ''
-        # Basic phone validation if provided
-        if len(value.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')) < 6:
-            raise serializers.ValidationError('Phone number must contain at least 6 digits')
+    def validate_password(self, value):
+        """Validate password"""
+        if len(value) < 8:
+            raise serializers.ValidationError('Le mot de passe doit contenir au moins 8 caractères.')
         return value
     
     def validate(self, data):
-        if data.get('password') != data.get('password_confirm'):
-            raise serializers.ValidationError({'password': 'Passwords do not match'})
-        if len(data.get('password', '')) < 8:
-            raise serializers.ValidationError({'password': 'Password must be at least 8 characters'})
+        """Validate the entire object"""
+        password = data.get('password')
+        password_confirm = data.get('password_confirm')
+        
+        if password != password_confirm:
+            raise serializers.ValidationError({
+                'password_confirm': 'Les mots de passe ne correspondent pas.'
+            })
         
         # Generate username from email if not provided
         if not data.get('username'):
@@ -65,20 +74,20 @@ class RegisterSerializer(serializers.ModelSerializer):
         return data
     
     def create(self, validated_data):
-        validated_data.pop('password_confirm')
+        """Create user"""
+        validated_data.pop('password_confirm', None)
         password = validated_data.pop('password')
         
-        # Create user manually to avoid issues with create_user
-        user = CustomUser(
+        # Create user
+        user = CustomUser.objects.create_user(
             email=validated_data.get('email'),
             username=validated_data.get('username'),
             first_name=validated_data.get('first_name', ''),
             last_name=validated_data.get('last_name', ''),
             phone=validated_data.get('phone', ''),
-            is_active=True,
+            password=password,
         )
-        user.set_password(password)
-        user.save()
+        
         return user
 
 
