@@ -14,15 +14,15 @@ class CustomUser(AbstractUser):
     email = models.EmailField(unique=True)
     phone = models.CharField(
         max_length=20,
+        blank=True,
+        null=True,
         validators=[
             RegexValidator(
-                regex=r'^\+?1?\d{9,15}$',
-                message='Phone number must contain 9-15 digits',
+                regex=r'^(\+\d{1,3})?[\d\s\-()]{6,}$',
+                message='Phone number must be valid (6+ digits)',
                 code='invalid_phone'
             )
-        ],
-        blank=True,
-        null=True
+        ]
     )
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='buyer')
     profile_picture = models.ImageField(upload_to='profile_pictures/', null=True, blank=True)

@@ -22,26 +22,61 @@ class RegisterSerializer(serializers.ModelSerializer):
     
     password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
     password_confirm = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
+    firstName = serializers.CharField(source='first_name', required=False, allow_blank=True, default='')
+    lastName = serializers.CharField(source='last_name', required=False, allow_blank=True, default='')
+    phone = serializers.CharField(required=False, allow_blank=True, default='')
     
     class Meta:
         model = CustomUser
-        fields = ['email', 'username', 'first_name', 'last_name', 'phone', 'password', 'password_confirm']
+        fields = ['email', 'username', 'firstName', 'lastName', 'phone', 'password', 'password_confirm']
         extra_kwargs = {
-            'first_name': {'required': False},
-            'last_name': {'required': False},
+            'firstName': {'required': False},
+            'lastName': {'required': False},
+            'phone': {'required': False},
+            'username': {'required': False},
         }
     
+    def validate_email(self, value):
+        """Check if email already exists"""
+        if CustomUser.objects.filter(email=value.lower()).exists():
+            raise serializers.ValidationError('This email is already registered.')
+        return value.lower()
+    
+    def validate_phone(self, value):
+        """Allow empty phones, validate non-empty"""
+        if not value or value.strip() == '':
+            return ''
+        # Basic phone validation if provided
+        if len(value.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')) < 6:
+            raise serializers.ValidationError('Phone number must contain at least 6 digits')
+        return value
+    
     def validate(self, data):
-        if data['password'] != data['password_confirm']:
+        if data.get('password') != data.get('password_confirm'):
             raise serializers.ValidationError({'password': 'Passwords do not match'})
-        if len(data['password']) < 8:
+        if len(data.get('password', '')) < 8:
             raise serializers.ValidationError({'password': 'Password must be at least 8 characters'})
+        
+        # Generate username from email if not provided
+        if not data.get('username'):
+            email = data.get('email', '')
+            data['username'] = email.split('@')[0] if email else 'user'
+        
         return data
     
     def create(self, validated_data):
         validated_data.pop('password_confirm')
         password = validated_data.pop('password')
-        user = CustomUser.objects.create_user(**validated_data)
+        
+        # Create user manually to avoid issues with create_user
+        user = CustomUser(
+            email=validated_data.get('email'),
+            username=validated_data.get('username'),
+            first_name=validated_data.get('first_name', ''),
+            last_name=validated_data.get('last_name', ''),
+            phone=validated_data.get('phone', ''),
+            is_active=True,
+        )
         user.set_password(password)
         user.save()
         return user
@@ -54,9 +89,20 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True, style={'input_type': 'password'})
     
     def validate(self, data):
-        user = authenticate(username=data['email'], password=data['password'])
-        if not user:
+        email = data.get('email')
+        password = data.get('password')
+        
+        try:
+            user = CustomUser.objects.get(email=email)
+        except CustomUser.DoesNotExist:
             raise serializers.ValidationError('Invalid email or password')
+        
+        if not user.check_password(password):
+            raise serializers.ValidationError('Invalid email or password')
+        
+        if not user.is_active:
+            raise serializers.ValidationError('This account is inactive')
+        
         data['user'] = user
         return data
 

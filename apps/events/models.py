@@ -28,3 +28,30 @@ class Event(models.Model):
     
     def __str__(self):
         return self.title
+    
+    def get_tickets_sold(self):
+        """Get count of tickets sold for this event"""
+        from apps.orders.models import Order
+        return Order.objects.filter(event=self, status='completed').count()
+    
+    def get_available_tickets(self):
+        """Get available tickets count"""
+        return max(0, self.capacity - self.get_tickets_sold())
+    
+    def get_tickets_sold(self):
+        """Count total tickets sold for this event"""
+        from apps.orders.models import Order, OrderStatus
+        return Order.objects.filter(
+            event=self,
+            status__in=[OrderStatus.CONFIRMED, OrderStatus.COMPLETED]
+        ).count()
+    
+    @property
+    def tickets_remaining(self):
+        """Calculate remaining tickets"""
+        return self.capacity - self.get_tickets_sold()
+    
+    @property
+    def is_available(self):
+        """Check if tickets are still available"""
+        return self.status == 'published' and self.tickets_remaining > 0
