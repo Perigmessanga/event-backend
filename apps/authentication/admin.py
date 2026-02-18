@@ -19,8 +19,8 @@ class CustomUserAdmin(BaseUserAdmin):
 
 @admin.register(OTPVerification)
 class OTPVerificationAdmin(admin.ModelAdmin):
-    list_display = ['user', 'otp_type', 'is_verified', 'attempts', 'created_at', 'expires_at']
+    list_display = ['user', 'code', 'verified', 'created_at']   # <-- seulement les vrais champs
     search_fields = ['user__email', 'user__phone']
-    list_filter = ['otp_type', 'is_verified', 'created_at']
+    list_filter = ['verified', 'created_at']                    # <-- seulement les vrais champs
     ordering = ['-created_at']
     readonly_fields = ['created_at']

@@ -6,7 +6,7 @@ from django.utils import timezone
 from datetime import timedelta
 from .models import Event
 from .serializers import EventListSerializer, EventDetailSerializer, EventCreateUpdateSerializer
-
+from apps import events 
 
 class IsOrganizerOrReadOnly(permissions.BasePermission):
     """Allow only organizers to edit their events"""
@@ -55,7 +55,7 @@ class EventViewSet(viewsets.ModelViewSet):
             return Event.objects.filter(status='published').order_by('-start_date')
         
         # For my_events, return user's events
-        if self.action == 'my_events':
+        #if self.action == 'my_events':
             if user.is_authenticated:
                 return Event.objects.filter(organizer=user).order_by('-start_date')
             return Event.objects.none()
@@ -81,9 +81,8 @@ class EventViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
     def my_events(self, request):
-        """Get events organized by the current user"""
         events = Event.objects.filter(organizer=request.user).order_by('-start_date')
-        serializer = self.get_serializer(events, many=True)
+        serializer = EventListSerializer(events, many=True, context={'request': request})
         return Response(serializer.data)
     
     @action(detail=False, methods=['get'], permission_classes=[permissions.AllowAny])

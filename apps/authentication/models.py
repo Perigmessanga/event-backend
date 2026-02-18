@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import RegexValidator
+from django.utils import timezone
+import random
 
 class CustomUser(AbstractUser):
     """Custom User Model with additional fields for Event Management"""
@@ -62,24 +64,27 @@ class CustomUser(AbstractUser):
         self.save()
 
 
-class OTPVerification(models.Model):
-    """OTP verification for phone and email"""
-    
-    OTP_TYPE_CHOICES = [
-        ('phone', 'Phone'),
-        ('email', 'Email'),
-    ]
-    
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='otp_verification')
-    otp_code = models.CharField(max_length=6)
-    otp_type = models.CharField(max_length=10, choices=OTP_TYPE_CHOICES)
-    is_verified = models.BooleanField(default=False)
-    attempts = models.IntegerField(default=0)
+from django.conf import settings
+from django.db import models
+
+class OTP(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="otps"  # <-- unique name
+    )
+    code = models.CharField(max_length=6)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
-    
-    class Meta:
-        db_table = 'otp_verification'
-    
-    def __str__(self):
-        return f"OTP for {self.user.email} ({self.otp_type})"
+
+class OTPVerification(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="otp_verifications"  # <-- unique name
+    )
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    verified = models.BooleanField(default=False)
+
+
