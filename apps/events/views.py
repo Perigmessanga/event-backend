@@ -31,7 +31,6 @@ class EventViewSet(viewsets.ModelViewSet):
     - Availability: GET /api/v1/events/{id}/availability/
     """
     queryset = Event.objects.all().order_by('-start_date')
-    permission_classes = [permissions.AllowAny]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['status', 'organizer', 'location']
     search_fields = ['title', 'description', 'location']
@@ -47,21 +46,21 @@ class EventViewSet(viewsets.ModelViewSet):
         return EventListSerializer
     
     def get_queryset(self):
-        """Filter events based on authentication and action"""
         user = self.request.user
-        
-        # For list, only published events
+
+    # Liste publique → seulement events publiés
         if self.action == 'list':
-            return Event.objects.filter(status='published').order_by('-start_date')
-        
-        # For my_events, return user's events
-        #if self.action == 'my_events':
-            if user.is_authenticated:
-                return Event.objects.filter(organizer=user).order_by('-start_date')
-            return Event.objects.none()
-        
-        # For all other actions, return all events
+         return Event.objects.filter(status='published').order_by('-start_date')
+
+    # Mes événements
+        if self.action == 'my_events':
+         if user.is_authenticated:
+            return Event.objects.filter(organizer=user).order_by('-start_date')
+        return Event.objects.none()
+
+    # Détail / update / delete
         return Event.objects.all().order_by('-start_date')
+
     
     def get_permissions(self):
         """Set permissions based on action"""
@@ -74,10 +73,8 @@ class EventViewSet(viewsets.ModelViewSet):
         return [permission() for permission in permission_classes]
     
     def perform_create(self, serializer):
-        """Automatically set the organizer to the current user"""
-        if not self.request.user.is_authenticated:
-            raise permissions.NotAuthenticated()
         serializer.save(organizer=self.request.user)
+
     
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
     def my_events(self, request):
@@ -120,7 +117,8 @@ class EventViewSet(viewsets.ModelViewSet):
         event.save()
         return Response({
             'message': 'Event published successfully',
-            'event': EventDetailSerializer(event).data
+            'event': EventDetailSerializer(event, context={'request': request}).data
+
         }, status=status.HTTP_200_OK)
     
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
@@ -136,7 +134,8 @@ class EventViewSet(viewsets.ModelViewSet):
         event.save()
         return Response({
             'message': 'Event cancelled successfully',
-            'event': EventDetailSerializer(event).data
+            'event': EventDetailSerializer(event, context={'request': request}).data
+
         }, status=status.HTTP_200_OK)
     
     @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny])

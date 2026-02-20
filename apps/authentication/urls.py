@@ -2,6 +2,9 @@ from . import views
 from django.urls import path
 from .views import RegisterView, LoginView, ProfileView
 from rest_framework_simplejwt.views import TokenRefreshView
+from .views import RegisterView, LoginView, ProfileView, verify_otp, send_otp
+
+
 
 app_name = 'authentication'
 

@@ -30,7 +30,7 @@ def create_otp_for_user(user, otp_type='email'):
         send_mail(
             subject="Votre code de vérification OTP",
             message=f"Bonjour {user.full_name},\n\nVotre code OTP est : {otp_code}\nIl expire dans 10 minutes.",
-            from_email="no-reply@tikerama.com",
+            from_email="no-reply@awarddan.com",
             recipient_list=[user.email],
         )
     # Pour SMS, intégrer Twilio ou autre ici

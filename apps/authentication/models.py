@@ -78,11 +78,13 @@ class OTP(models.Model):
     expires_at = models.DateTimeField()
 
 class OTPVerification(models.Model):
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="otp_verifications"  # <-- unique name
-    )
+    email = models.EmailField(unique=True)
+    otp_code = models.CharField(max_length=6)
+    is_verified = models.BooleanField(default=False)
+    expires_at = models.DateTimeField()
+    pending_user_data = models.JSONField(null=True, blank=True)  # Stocke les données temporaires
+
+    
     code = models.CharField(max_length=6)
     created_at = models.DateTimeField(auto_now_add=True)
     verified = models.BooleanField(default=False)

@@ -1,239 +1,172 @@
-from rest_framework import status, permissions
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import authenticate, get_user_model
-from .serializers import RegisterSerializer, LoginSerializer, UserSerializer
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from .models import CustomUser
-from django.conf import settings
-
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from rest_framework import status
-from .models import CustomUser, OTPVerification
-from django.utils import timezone
 # apps/authentication/views.py
-import json                     # Pour json.loads()
-from datetime import timedelta   # Pour définir l'expiration OTP
-from django.utils import timezone
-from django.http import JsonResponse  # Pour renvoyer des réponses JSON
-
-from twilio.rest import Client   # Pour envoyer des SMS
-from .models import CustomUser, OTPVerification
 import random
-# apps/auth/views.py
+import json
+from datetime import timedelta
+from django.contrib.auth import authenticate
+
+
+from django.utils import timezone
+from django.core.mail import send_mail
+from django.conf import settings
+from django.contrib.auth import get_user_model
+
 from rest_framework.views import APIView
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from django.contrib.auth.models import User
-from .utils import generate_otp, verify_otp
 
-FROM_EMAIL = getattr(settings, "DEFAULT_FROM_EMAIL", "Blbla <noreply@tikerama.com>")
-
-class SendOTPView(APIView):
-    def post(self, request):
-        email = request.data.get("email")
-        user = User.objects.filter(email=email).first()
-        if not user:
-            return Response({"error": "Utilisateur non trouvé"}, status=status.HTTP_404_NOT_FOUND)
-        
-        generate_otp(user)
-        return Response({"message": "OTP envoyé"}, status=status.HTTP_200_OK)
-
-class VerifyOTPView(APIView):
-    def post(self, request):
-        email = request.data.get("email")
-        code = request.data.get("code")
-        user = User.objects.filter(email=email).first()
-        if not user:
-            return Response({"error": "Utilisateur non trouvé"}, status=status.HTTP_404_NOT_FOUND)
-        
-        if verify_otp(user, code):
-            return Response({"message": "OTP validé"}, status=status.HTTP_200_OK)
-        return Response({"error": "OTP invalide ou expiré"}, status=status.HTTP_400_BAD_REQUEST)
-
+from .models import OTPVerification
+from .serializers import RegisterSerializer, UserSerializer
 
 User = get_user_model()
+FROM_EMAIL = getattr(settings, "DEFAULT_FROM_EMAIL", "Blbla <noreply@tikerama.com>")
 
-
-# =========================================
-# REGISTER VIEW
-# =========================================
-
+# -------------------------------
+# REGISTER VIEW: demande OTP
+# -------------------------------
 class RegisterView(APIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
-            user = serializer.save()  # Récupère l'utilisateur créé dans le serializer
-            print("Utilisateur créé :", user)
-            # ⚡ ENVOI DE L'OTP
-            send_otp_to_user(user)
-            
-            refresh = RefreshToken.for_user(user)
-            
-            return Response({
-                'message': 'User registered successfully. OTP envoyé.',
-                'user': UserSerializer(user).data,
-                # 'refresh': str(refresh),
-                # 'access': str(refresh.access_token),
-            }, status=status.HTTP_201_CREATED)
-        
+            user_data = serializer.validated_data
+
+            # Générer OTP
+            otp_code = str(random.randint(100000, 999999))
+
+            # Stocker OTP et données utilisateur temporairement
+            OTPVerification.objects.update_or_create(
+                email=user_data['email'],
+                defaults={
+                    "otp_code": otp_code,
+                    "expires_at": timezone.now() + timedelta(minutes=5),
+                    "is_verified": False,
+                    "pending_user_data": user_data
+                }
+            )
+
+            # Envoyer OTP par email
+            send_mail(
+                subject="Votre code OTP Tikerama",
+                message=f"Votre code OTP est : {otp_code}",
+                from_email=FROM_EMAIL,
+                recipient_list=[user_data['email']],
+                fail_silently=False,
+            )
+
+            return Response({"message": "OTP envoyé. Vérifiez votre email."}, status=status.HTTP_200_OK)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
-def send_otp_to_user(user):
-    """Crée un OTP et l'envoie par email ou SMS"""
-    otp_code = str(random.randint(100000, 999999))
-    OTPVerification.objects.update_or_create(
-    user=user,
-    defaults={
-        "code": otp_code,
-        "verified": False,
-        "created_at": timezone.now()
-    }
-)
-
-
-    # ⚡ Email
-    from django.core.mail import send_mail
-    send_mail(
-        subject="Votre code OTP",
-        message=f"Votre code OTP est : {otp_code}",
-        from_email=FROM_EMAIL,
-        recipient_list=[user.email],
-        fail_silently=True,
-    )
-
-    # ⚡ SMS avec Twilio (optionnel)
-    # client = Client(TWILIO_SID, TWILIO_AUTH)
-    # client.messages.create(
-    #     body=f"Votre code OTP est : {otp_code}",
-    #     from_=TWILIO_PHONE,
-    #     to=user.phone
-    # )
-
-
-
-# =========================================
-# LOGIN VIEW
-# =========================================
-class LoginView(APIView):
-    """
-    POST /api/v1/auth/login/
-    Authenticate user with email and password, return JWT tokens
-    """
-    permission_classes = [permissions.AllowAny]
-
-    def post(self, request):
-        serializer = LoginSerializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.validated_data['user']
-            refresh = RefreshToken.for_user(user)
-            
-            return Response({
-                'message': 'Login successful',
-                'user': UserSerializer(user).data,
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-            }, status=status.HTTP_200_OK)
-        
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-# =========================================
-# PROFILE / ME VIEW
-# =========================================
+# -------------------------------
+# PROFILE VIEW
+# -------------------------------
 class ProfileView(APIView):
-    """
-    GET /api/v1/auth/me/
-    Get authenticated user's profile
-    """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user_data = UserSerializer(request.user).data
-        return Response(user_data, status=status.HTTP_200_OK)
+        return Response(UserSerializer(request.user).data, status=status.HTTP_200_OK)
 
-    def put(self, request):
-        """Update user profile"""
-        serializer = UserSerializer(request.user, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response({
-                'message': 'Profile updated successfully',
-                'user': serializer.data
-            }, status=status.HTTP_200_OK)
-        
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-
-TWILIO_SID = "TON_SID"
-TWILIO_AUTH = "TON_AUTH_TOKEN"
-TWILIO_PHONE = "+123456789"
-
+# -------------------------------
+# OTP PUBLIC ENDPOINTS
+# -------------------------------
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def send_otp(request):
-    if request.method == "POST":
-        data = json.loads(request.body)
-        email_or_phone = data.get("email") or data.get("phone")
-        user = CustomUser.objects.filter(email=email_or_phone).first()
-        if not user:
-            return JsonResponse({"error": "Utilisateur non trouvé"}, status=404)
+    email = request.data.get("email")
 
-        otp_code = str(random.randint(100000, 999999))
-        OTPVerification.objects.update_or_create(
-            user=user,
-            otp_type="email",
-            defaults={
-                "otp_code": otp_code,
-                "expires_at": timezone.now() + timedelta(minutes=5),
-                "is_verified": False
-            }
+    if not email:
+        return Response(
+            {"error": "Email requis"},
+            status=status.HTTP_400_BAD_REQUEST
         )
-
-        # Envoi par email ou SMS
-        client = Client("TWILIO_SID", "TWILIO_AUTH_TOKEN")
-        client.messages.create(
-            body=f"Votre code OTP est : {otp_code}",
-            from_="+1234567890",
-            to=user.phone
-        )
-
-        return JsonResponse({"message": "OTP envoyé"})
-
-@api_view(['POST'])
-def verify_otp(request):
-    email = request.data.get('email')
-    code = request.data.get('otp_code')  # tu peux garder 'otp_code' côté frontend
 
     try:
-        user = CustomUser.objects.get(email=email)
-        # Utiliser les nouveaux champs 'code' et 'verified'
-        otp_obj = OTPVerification.objects.get(user=user, code=code, verified=False)
-
-        # Vérifier si l'OTP est expiré (tu peux créer expires_at si tu veux, sinon juste vérifier created_at)
-        # Par exemple, 5 minutes de validité
-        expiration_time = otp_obj.created_at + timezone.timedelta(minutes=5)
-        if timezone.now() > expiration_time:
-            return Response({'error': 'OTP expiré'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Marquer l'OTP comme vérifié
-        otp_obj.verified = True
-        otp_obj.save()
-
-        # Marquer l'email comme vérifié
-        user.is_email_verified = True
-        user.save()
-
-        return Response({'message': 'OTP validé, vous pouvez vous connecter'}, status=status.HTTP_200_OK)
-
-    except CustomUser.DoesNotExist:
-        return Response({'error': 'Utilisateur introuvable'}, status=status.HTTP_404_NOT_FOUND)
+        otp_obj = OTPVerification.objects.get(email=email)
     except OTPVerification.DoesNotExist:
-        return Response({'error': 'OTP invalide'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"error": "Aucune demande d'inscription trouvée pour cet email"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Générer nouveau code
+    otp_code = str(random.randint(100000, 999999))
+
+    otp_obj.otp_code = otp_code
+    otp_obj.is_verified = False
+    otp_obj.expires_at = timezone.now() + timedelta(minutes=5)
+    otp_obj.save()
+
+    # Envoi email
+    send_mail(
+        subject="Votre code OTP",
+        message=f"Votre nouveau code OTP est : {otp_code}",
+        from_email=FROM_EMAIL,
+        recipient_list=[email],
+        fail_silently=False,
+    )
+
+    return Response(
+        {"message": "OTP renvoyé avec succès"},
+        status=status.HTTP_200_OK
+    )
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def verify_otp(request):
+    email = request.data.get("email")
+    code = request.data.get("otp_code")
+
+    try:
+        # On récupère l'OTP non vérifié pour cet email
+        otp_obj = OTPVerification.objects.get(email=email, otp_code=code, is_verified=False)
+    except OTPVerification.DoesNotExist:
+        return Response({"error": "OTP invalide ou expiré"}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Vérifier si l'OTP est expiré
+    if timezone.now() > otp_obj.expires_at:
+        return Response({"error": "OTP expiré"}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Créer l'utilisateur seulement si OTP valide
+    serializer = RegisterSerializer(data=otp_obj.pending_user_data)
+    serializer.is_valid(raise_exception=True)
+    user = serializer.save()
+
+    # Marquer l'OTP comme utilisé
+    otp_obj.is_verified = True
+    otp_obj.save()
+
+    return Response({
+        "message": "Compte créé avec succès, vous pouvez maintenant vous connecter.",
+        "user": UserSerializer(user).data
+    }, status=status.HTTP_201_CREATED)
+
+    from django.contrib.auth import authenticate
+from rest_framework_simplejwt.tokens import RefreshToken
+
+class LoginView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get("email")
+        password = request.data.get("password")
+
+        user = authenticate(request, email=email, password=password)
+
+        if user is None:
+            return Response(
+                {"error": "Email ou mot de passe incorrect"},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        refresh = RefreshToken.for_user(user)
+
+        return Response({
+            "message": "Connexion réussie",
+            "refresh": str(refresh),
+            "access": str(refresh.access_token),
+            "user": UserSerializer(user).data
+        })
 

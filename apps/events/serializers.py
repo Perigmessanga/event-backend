@@ -43,21 +43,20 @@ class EventDetailSerializer(serializers.ModelSerializer):
 
 
 class EventCreateUpdateSerializer(serializers.ModelSerializer):
-    """Serializer for creating and updating events"""
-    
-    class Meta:
-        model = Event
-        fields = [
-            'title', 'description', 'image', 'location',
-            'start_date', 'end_date', 'capacity', 'ticket_price', 'status'
-        ]
-    
+    ...
     def validate(self, data):
-        """Validate event dates"""
-        if data.get('start_date') >= data.get('end_date'):
+        start = data.get('start_date')
+        end = data.get('end_date')
+
+        if start and end and start >= end:
             raise serializers.ValidationError('Start date must be before end date')
+
         if data.get('capacity', 0) <= 0:
             raise serializers.ValidationError('Capacity must be greater than 0')
+
         if data.get('ticket_price', 0) < 0:
             raise serializers.ValidationError('Ticket price cannot be negative')
+
         return data
+
+
