@@ -1,5 +1,4 @@
-from django.db import models
-
+from django.db import models, transaction
 
 class Payment(models.Model):
     STATUS_CHOICES = [
@@ -16,6 +15,7 @@ class Payment(models.Model):
     transaction_id = models.CharField(max_length=255, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    awdpay_transaction_id = models.CharField(max_length=255, unique=True, null=True, blank=True)
     
     class Meta:
         db_table = 'payments'
@@ -23,3 +23,11 @@ class Payment(models.Model):
     
     def __str__(self):
         return f"Payment {self.id} - {self.status}"
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+            if self.status == 'completed':
+                self.order.status = 'paid'
+                self.order.save()
+                # Ici tu peux ajouter l'envoi d'email ou QR Code

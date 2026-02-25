@@ -1,62 +1,129 @@
 from rest_framework import serializers
-from .models import Event
+from .models import Event, TicketType, Category
 from apps.authentication.serializers import UserSerializer
 
+# ==============================
+# CATEGORY SERIALIZER
+# ==============================
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = ['id', 'name', 'slug', 'description']
 
+# ==============================
+# TICKET TYPE SERIALIZER
+# ==============================
+class TicketTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TicketType
+        fields = ['id', 'name', 'price', 'available']
+
+# ==============================
+# EVENT LIST SERIALIZER
+# ==============================
 class EventListSerializer(serializers.ModelSerializer):
-    """Simplified serializer for event list"""
     organizer = UserSerializer(read_only=True)
-    
+    category = CategorySerializer(read_only=True)
+    image_url = serializers.SerializerMethodField()
+
     class Meta:
         model = Event
         fields = [
-            'id', 'title', 'description', 'image', 'location',
+            'id', 'title', 'description', 'image_url', 'location',
             'start_date', 'end_date', 'capacity', 'ticket_price',
-            'status', 'organizer', 'created_at'
+            'status', 'organizer', 'created_at', 'category',
         ]
         read_only_fields = ['id', 'created_at', 'organizer']
 
+    def get_image_url(self, obj):
+        request = self.context.get("request")
+        if obj.image:
+            return request.build_absolute_uri(obj.image.url)
+        return None
 
+# ==============================
+# EVENT DETAIL SERIALIZER
+# ==============================
 class EventDetailSerializer(serializers.ModelSerializer):
-    """Full serializer for event detail"""
     organizer = UserSerializer(read_only=True)
+    category = CategorySerializer(read_only=True)
+    ticketTypes = TicketTypeSerializer(many=True, read_only=True)
+    image_url = serializers.SerializerMethodField()
     tickets_available = serializers.SerializerMethodField()
     tickets_sold = serializers.SerializerMethodField()
-    
+
+    class Meta:
+        model = Event
+        fields = [
+            'id', 'title', 'description', 'image_url', 'location',
+            'start_date', 'end_date', 'capacity', 'ticket_price', 'status',
+            'organizer', 'created_at', 'updated_at',
+            'tickets_available', 'tickets_sold', 'category', 'ticketTypes',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'organizer']
+
+    def get_image_url(self, obj):
+        request = self.context.get("request")
+        if obj.image:
+            return request.build_absolute_uri(obj.image.url)
+        return None
+
+    def get_tickets_sold(self, obj):
+        return obj.get_tickets_sold()
+
+    def get_tickets_available(self, obj):
+        return obj.capacity - obj.get_tickets_sold()
+
+# ==============================
+# EVENT CREATE / UPDATE SERIALIZER
+# ==============================
+class EventCreateUpdateSerializer(serializers.ModelSerializer):
+    ticketTypes = TicketTypeSerializer(many=True, required=False)
+    organizer = UserSerializer(read_only=True)
+
     class Meta:
         model = Event
         fields = [
             'id', 'title', 'description', 'image', 'location',
-            'start_date', 'end_date', 'capacity', 'ticket_price',
-            'status', 'organizer', 'created_at', 'updated_at',
-            'tickets_available', 'tickets_sold'
+            'start_date', 'end_date', 'capacity', 'ticket_price', 'status',
+            'category', 'organizer', 'ticketTypes'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'organizer']
-    
-    def get_tickets_available(self, obj):
-        """Calculate available tickets"""
-        return obj.capacity - obj.get_tickets_sold()
-    
-    def get_tickets_sold(self, obj):
-        """Get number of tickets sold"""
-        return obj.get_tickets_sold()
+        read_only_fields = ['organizer']
 
-
-class EventCreateUpdateSerializer(serializers.ModelSerializer):
-    ...
+    # --------------------------
+    # VALIDATION
+    # --------------------------
     def validate(self, data):
         start = data.get('start_date')
         end = data.get('end_date')
-
         if start and end and start >= end:
-            raise serializers.ValidationError('Start date must be before end date')
-
-        if data.get('capacity', 0) <= 0:
-            raise serializers.ValidationError('Capacity must be greater than 0')
-
-        if data.get('ticket_price', 0) < 0:
-            raise serializers.ValidationError('Ticket price cannot be negative')
-
+            raise serializers.ValidationError({'end_date': 'Start date must be after start date'})
+        if 'capacity' in data and data['capacity'] <= 0:
+            raise serializers.ValidationError({'capacity': 'Capacity must be greater than 0'})
+        if 'ticket_price' in data and data['ticket_price'] < 0:
+            raise serializers.ValidationError({'ticket_price': 'Ticket price cannot be negative'})
         return data
 
+    # --------------------------
+    # CREATE
+    # --------------------------
+    def create(self, validated_data):
+        ticket_data = validated_data.pop('ticketTypes', [])
+        event = Event.objects.create(**validated_data)
+        for ticket in ticket_data:
+            TicketType.objects.create(event=event, **ticket)
+        return event
 
+    # --------------------------
+    # UPDATE (PATCH SAFE)
+    # --------------------------
+    def update(self, instance, validated_data):
+        ticket_data = validated_data.pop('ticketTypes', None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        if ticket_data is not None:
+            instance.ticketTypes.all().delete()
+            for ticket in ticket_data:
+                TicketType.objects.create(event=instance, **ticket)
+        return instance

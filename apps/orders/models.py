@@ -1,11 +1,11 @@
 from django.db import models
 
-
 class Order(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('confirmed', 'Confirmed'),
         ('cancelled', 'Cancelled'),
+        ('paid', 'Paid'),  # ajouté pour Payment
     ]
     
     user = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE, related_name='orders')
@@ -22,3 +22,8 @@ class Order(models.Model):
     
     def __str__(self):
         return f"Order {self.id} - {self.user.email}"
+    
+    def calculate_total(self):
+        """Calcule le total automatiquement selon quantity et event.ticket_price"""
+        self.total_amount = self.quantity * self.event.ticket_price
+        return self.total_amount
