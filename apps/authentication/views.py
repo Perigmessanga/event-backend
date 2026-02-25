@@ -111,7 +111,7 @@ def send_otp(request):
     otp_obj.save()
 
     send_mail(
-        subject="Votre code OTP EventManager",
+        subject="Votre code OTP Award Dan",
         message=f"Votre nouveau code OTP est : {otp_code}",
         from_email=FROM_EMAIL,
         recipient_list=[email],
