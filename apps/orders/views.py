@@ -2,6 +2,7 @@ from rest_framework import viewsets, permissions
 from .models import Order
 from .serializers import OrderSerializer
 
+
 class IsOwnerOrAdmin(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         return request.user.is_staff or obj.user == request.user
@@ -9,6 +10,7 @@ class IsOwnerOrAdmin(permissions.BasePermission):
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
+    permission_classes= [permissions.IsAuthenticated]
 
     def get_permissions(self):
         if self.action in ['update', 'partial_update', 'destroy']:

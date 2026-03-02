@@ -34,6 +34,8 @@ urlpatterns = [
     # API v1 - Commandes et Paiements
     path('api/v1/orders/', include('apps.orders.urls')),
     path('api/v1/payments/', include('apps.payments.urls')),
+    path("api/contact/", include("apps.contact.urls")),
+    path('api/v1/tickets/', include('apps.tickets.urls')),
 
     # API v1 - Notifications (si besoin)
    # path('api/v1/notifications/', include('apps.notifications.urls')),

@@ -14,9 +14,18 @@ class CategorySerializer(serializers.ModelSerializer):
 # TICKET TYPE SERIALIZER
 # ==============================
 class TicketTypeSerializer(serializers.ModelSerializer):
+    available = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = TicketType
-        fields = ['id', 'name', 'price', 'available']
+        fields = [
+            "id",
+            "name",
+            "description",
+            "price",
+            "available",
+            "max_per_order",
+        ]
 
 # ==============================
 # EVENT LIST SERIALIZER
@@ -47,7 +56,7 @@ class EventListSerializer(serializers.ModelSerializer):
 class EventDetailSerializer(serializers.ModelSerializer):
     organizer = UserSerializer(read_only=True)
     category = CategorySerializer(read_only=True)
-    ticketTypes = TicketTypeSerializer(many=True, read_only=True)
+    ticketTypes = TicketTypeSerializer(many=True, read_only=True)  # ← IMPORTANT
     image_url = serializers.SerializerMethodField()
     tickets_available = serializers.SerializerMethodField()
     tickets_sold = serializers.SerializerMethodField()
@@ -69,10 +78,11 @@ class EventDetailSerializer(serializers.ModelSerializer):
         return None
 
     def get_tickets_sold(self, obj):
-        return obj.get_tickets_sold()
+        return obj.get_tickets_sold() if hasattr(obj, "get_tickets_sold") else 0
 
     def get_tickets_available(self, obj):
-        return obj.capacity - obj.get_tickets_sold()
+        sold = self.get_tickets_sold(obj)
+        return max(obj.capacity - sold, 0)
 
 # ==============================
 # EVENT CREATE / UPDATE SERIALIZER
@@ -127,3 +137,12 @@ class EventCreateUpdateSerializer(serializers.ModelSerializer):
             for ticket in ticket_data:
                 TicketType.objects.create(event=instance, **ticket)
         return instance
+
+class EventPublicDetailSerializer(serializers.ModelSerializer):
+    ticket_types = TicketTypeSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Event
+        fields = "__all__"
+
+    
