@@ -30,7 +30,7 @@ class Payment(models.Model):
             super().save(*args, **kwargs)
 
             if is_new_or_just_completed:
-                self.order.status = 'paid'
+                self.order.status = 'completed'
                 self.order.save()
                 
                 # Génère les tickets

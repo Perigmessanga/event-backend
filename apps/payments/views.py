@@ -4,7 +4,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.db import transaction
 from .models import Payment
-from .serializers import PaymentSerializer
+from rest_framework import generics
+from .serializers import PaymentSerializer, AdminPaymentSerializer
+
 from apps.orders.models import Order
 import uuid
 
@@ -27,26 +29,49 @@ class PaymentViewSet(viewsets.ModelViewSet):
     # =========================================
     @action(detail=False, methods=['post'], url_path='initiate')
     def initiate_payment(self, request):
-        """
-        Crée un paiement lié à une commande et génère un transaction_id.
-        React utilisera la réponse pour afficher la page Mobile Money.
-        """
         order_id = request.data.get('order_id')
         payment_method = request.data.get('payment_method')
+
+        if not order_id or not payment_method:
+            return Response(
+                {"error": "order_id et payment_method requis"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
             order = Order.objects.get(id=order_id, user=request.user)
         except Order.DoesNotExist:
-            return Response({"error": "Commande introuvable"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "Commande introuvable"},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
-        # Créer le paiement en status 'pending'
-        payment = Payment.objects.create(
+        # 🔒 Vérifier si déjà payée
+        if hasattr(order, 'payment') and order.payment.status == 'completed':
+            return Response(
+                {"error": "Cette commande est déjà payée"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    # 🔒 Vérifier si un paiement pending existe déjà
+        existing_payment = Payment.objects.filter(
             order=order,
-            amount=order.total_price,
-            payment_method=payment_method,
-            transaction_id=str(uuid.uuid4()),  # unique pour suivre le paiement
             status='pending'
-        )
+        ).first()
+
+        if existing_payment:
+            serializer = PaymentSerializer(existing_payment)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        # 🔐 Création transactionnelle
+        with transaction.atomic():
+            payment = Payment.objects.create(
+                order=order,
+                amount=order.total_price,
+                payment_method=payment_method,
+                transaction_id=str(uuid.uuid4()),
+                status='pending'
+            )
 
         serializer = PaymentSerializer(payment)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -84,6 +109,8 @@ class PaymentWebhookView(APIView):
                 payment = Payment.objects.get(transaction_id=transaction_id)
                 if status_tx.lower() == 'completed':
                     payment.status = 'completed'
+                    payment.order.status = 'confirmed'  # ou 'paid', selon ton choix
+                    payment.order.save()
                     payment.save()
                 elif status_tx.lower() == 'failed':
                     payment.status = 'failed'
@@ -91,3 +118,11 @@ class PaymentWebhookView(APIView):
             return Response({"message": "Webhook reçu"}, status=status.HTTP_200_OK)
         except Payment.DoesNotExist:
             return Response({"error": "Paiement inconnu"}, status=status.HTTP_404_NOT_FOUND)
+
+    class AdminPaymentViewSet(viewsets.ReadOnlyModelViewSet):
+        queryset = Payment.objects.select_related("order__user", "order__event")
+        serializer_class = AdminPaymentSerializer
+        permission_classes = [permissions.IsAdminUser]
+
+            
+

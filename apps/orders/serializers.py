@@ -45,3 +45,21 @@ class OrderSerializer(serializers.ModelSerializer):
         ticket_type = validated_data['ticket_type']
         validated_data['total_price'] = ticket_type.price * validated_data['quantity']
         return super().create(validated_data)
+
+class AdminOrderSerializer(serializers.ModelSerializer):
+    user_email = serializers.CharField(source="user.email", read_only=True)
+    event_title = serializers.CharField(source="event.title", read_only=True)
+    ticket_name = serializers.CharField(source="ticket_type.name", read_only=True)
+
+    class Meta:
+        model = Order
+        fields = [
+            "id",
+            "user_email",
+            "event_title",
+            "ticket_name",
+            "quantity",
+            "total_price",
+            "status",
+            "created_at",
+        ]

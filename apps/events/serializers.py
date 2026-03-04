@@ -56,10 +56,14 @@ class EventListSerializer(serializers.ModelSerializer):
 class EventDetailSerializer(serializers.ModelSerializer):
     organizer = UserSerializer(read_only=True)
     category = CategorySerializer(read_only=True)
-    ticketTypes = TicketTypeSerializer(many=True, read_only=True)  # ← IMPORTANT
+    ticket_types = TicketTypeSerializer(many=True, read_only=True)  # ← IMPORTANT
     image_url = serializers.SerializerMethodField()
     tickets_available = serializers.SerializerMethodField()
     tickets_sold = serializers.SerializerMethodField()
+    total = serializers.CharField(source='id')
+
+
+    
 
     class Meta:
         model = Event
@@ -67,9 +71,12 @@ class EventDetailSerializer(serializers.ModelSerializer):
             'id', 'title', 'description', 'image_url', 'location',
             'start_date', 'end_date', 'capacity', 'ticket_price', 'status',
             'organizer', 'created_at', 'updated_at',
-            'tickets_available', 'tickets_sold', 'category', 'ticketTypes',
+            'tickets_available', 'tickets_sold', 'category', 'ticket_types','total'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'organizer']
+
+    def get_total(self,obj):
+        return True
 
     def get_image_url(self, obj):
         request = self.context.get("request")
@@ -139,10 +146,13 @@ class EventCreateUpdateSerializer(serializers.ModelSerializer):
         return instance
 
 class EventPublicDetailSerializer(serializers.ModelSerializer):
-    ticket_types = TicketTypeSerializer(many=True, read_only=True)
+    ticketTypes = TicketTypeSerializer(
+        many=True,
+        read_only=True,
+        source='ticket_types'   # 👈 LA CORRECTION ICI
+    )
 
     class Meta:
         model = Event
         fields = "__all__"
-
-    
+        

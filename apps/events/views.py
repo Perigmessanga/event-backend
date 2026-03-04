@@ -5,9 +5,13 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from datetime import timedelta
 from rest_framework.filters import SearchFilter, OrderingFilter
-from rest_framework import generics
-from .models import Event, TicketType
-from .serializers import  TicketTypeSerializer
+from django.db.models import Sum, Count, Avg
+from rest_framework.views import APIView
+from apps.orders.models import Order
+from datetime import datetime
+from rest_framework import permissions
+from django.db.models.functions import TruncMonth
+
 
 
 from .models import Category, Event, TicketType
@@ -165,5 +169,55 @@ class EventViewSet(viewsets.ModelViewSet):
             'can_book': tickets_available > 0
         }, status=status.HTTP_200_OK)
 
-        
+class AdminSalesView(APIView):
+        permission_classes = [permissions.IsAdminUser]
 
+        def get(self, request):
+
+            # 📅 Filtres dynamiques
+            start_date = request.GET.get("start_date")
+            end_date = request.GET.get("end_date")
+
+            orders = Order.objects.filter(status="confirmed")
+
+            if start_date:
+                orders = orders.filter(created_at__gte=start_date)
+
+            if end_date:
+                orders = orders.filter(created_at__lte=end_date)
+
+            # 🔹 Totaux globaux
+            total_revenue = orders.aggregate(total=Sum("total_price"))["total"] or 0
+            total_tickets = orders.aggregate(total=Sum("quantity"))["total"] or 0
+            average_cart = orders.aggregate(avg=Avg("total_price"))["avg"] or 0
+
+            # 🔹 Top 5 événements
+            top_events = (
+                orders.values("event__title")
+                .annotate(revenue=Sum("total_price"))
+                .order_by("-revenue")[:5]
+            )
+
+            # 🔹 Evolution mensuelle
+            monthly_sales = (
+                orders.annotate(month=TruncMonth("created_at"))
+                .values("month")
+                .annotate(revenue=Sum("total_price"))
+                .order_by("month")
+            )
+
+            # 🔹 Distribution billets (Pie Chart)
+            ticket_distribution = (
+                orders.values("ticket_type__name")
+                .annotate(total=Sum("quantity"))
+                .order_by("-total")
+            )
+
+            return Response({
+                "total_revenue": total_revenue,
+                "total_tickets": total_tickets,
+                "average_cart": round(average_cart, 2),
+                "top_events": top_events,
+                "monthly_sales": monthly_sales,
+                "ticket_distribution": ticket_distribution,
+            })
