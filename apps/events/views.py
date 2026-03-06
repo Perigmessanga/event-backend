@@ -11,11 +11,26 @@ from apps.orders.models import Order
 from datetime import datetime
 from rest_framework import permissions
 from django.db.models.functions import TruncMonth
-
-
-
 from .models import Category, Event, TicketType
 from .serializers import CategorySerializer, EventListSerializer, EventDetailSerializer, EventCreateUpdateSerializer
+from rest_framework import serializers
+from .models import TicketType
+from .serializers import AdminTicketTypeSerializer
+from rest_framework.viewsets import ModelViewSet
+from rest_framework.permissions import IsAdminUser
+
+
+class AdminTicketTypeViewSet(ModelViewSet):
+    queryset = TicketType.objects.select_related("event").all()
+    serializer_class = AdminTicketTypeSerializer
+    permission_classes = [IsAdminUser]
+
+class AdminTicketTypeSerializer(serializers.ModelSerializer):
+    event_title = serializers.CharField(source="event.title", read_only=True)
+
+    class Meta:
+        model = TicketType
+        fields = "__all__"
 
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Category.objects.all()

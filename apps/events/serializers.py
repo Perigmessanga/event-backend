@@ -155,4 +155,13 @@ class EventPublicDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
         fields = "__all__"
+
+        
+
+class AdminTicketTypeSerializer(serializers.ModelSerializer):
+    event_title = serializers.CharField(source="event.title", read_only=True)
+
+    class Meta:
+        model = TicketType
+        fields = "__all__"
         
