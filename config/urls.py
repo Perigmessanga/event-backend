@@ -3,6 +3,7 @@ from django.urls import path, include
 from django.http import HttpResponse
 from django.conf import settings
 from django.conf.urls.static import static
+from apps.events.views import awdpay_webhook
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularSwaggerView,
@@ -36,6 +37,7 @@ urlpatterns = [
     path('api/v1/payments/', include('apps.payments.urls')),
     path("api/contact/", include("apps.contact.urls")),
     path('api/v1/tickets/', include('apps.tickets.urls')),
+    path('api/awdpay/webhook/', awdpay_webhook, name='awdpay_webhook'), # type: ignore
 
     # API v1 - Notifications (si besoin)
    # path('api/v1/notifications/', include('apps.notifications.urls')),

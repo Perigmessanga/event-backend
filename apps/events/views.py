@@ -18,6 +18,9 @@ from .models import TicketType
 from .serializers import AdminTicketTypeSerializer
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAdminUser
+from django.views.decorators.csrf import csrf_exempt
+from django.http import HttpResponse, JsonResponse
+from .awdpay_webhook import mark_payment_success
 
 
 class AdminTicketTypeViewSet(ModelViewSet):
@@ -236,3 +239,19 @@ class AdminSalesView(APIView):
                 "monthly_sales": monthly_sales,
                 "ticket_distribution": ticket_distribution,
             })
+
+
+# apps/events/views.py
+
+
+@csrf_exempt  # souvent nécessaire pour les webhooks
+def awdpay_webhook(request):
+    if request.method == "POST":
+        custom_identifier = request.POST.get("custom_identifier")
+        trx_id = request.POST.get("trx_id")
+        try:
+            mark_payment_success(custom_identifier=custom_identifier, trx_id=trx_id)
+            return JsonResponse({"status": "success"})
+        except Exception as e:
+            return JsonResponse({"status": "error", "message": str(e)}, status=400)
+    return HttpResponse("Method not allowed", status=405)

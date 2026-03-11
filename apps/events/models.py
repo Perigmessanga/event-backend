@@ -114,3 +114,30 @@ class TicketType(models.Model):
     def __str__(self):
         return f"{self.event.title} - {self.name}"
 
+
+
+# apps/events/models.py
+
+
+
+class EventRegistration(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='registrations'
+    )
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.CASCADE,
+        related_name='registrations'
+    )
+    custom_identifier = models.CharField(max_length=100, unique=True)
+    trx_id = models.CharField(max_length=100, null=True, blank=True)
+    status = models.CharField(max_length=20, default='pending')  # pending, confirmed, cancelled
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'event_registrations'
+
+    def __str__(self):
+        return f"{self.user} - {self.event}"
