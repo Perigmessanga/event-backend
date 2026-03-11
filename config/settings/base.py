@@ -7,7 +7,7 @@ from pathlib import Path
 from decouple import config
 from datetime import timedelta
 import dj_database_url
-from decouple import config
+
 
 
 
@@ -63,9 +63,10 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 # MIDDLEWARE
 # =====================================
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
+    
 
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -157,11 +158,10 @@ AUTH_USER_MODEL = 'authentication.CustomUser'
 # =====================================
 
 
-CORS_ALLOWED_ORIGINS = config(
-    'CORS_ALLOWED_ORIGINS',
-    default="http://localhost:8080,https://ton-frontend.vercel.app",
-    cast=lambda v: [s.strip() for s in v.split(',')]
-)
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "https://event-frontend-bay.vercel.app",
+]
 
 CSRF_TRUSTED_ORIGINS = [
     "https://*.vercel.app",
@@ -240,4 +240,29 @@ AWDPAY_PRIVATE_KEY = os.getenv("AWDPAY_PRIVATE_KEY")
 AWDPAY_BASE_URL = os.getenv("AWDPAY_BASE_URL")
 #FRONTEND_URL = os.getenv("FRONTEND_URL")
 FRONTEND_URL= "https://event-frontend-bay.vercel.app/" # type: ignore
-BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
+BACKEND_URL = os.getenv(
+    "BACKEND_URL",
+    "https://event-backend-5-qoix.onrender.com"
+)
+
+
+# settings.py
+
+INSTALLED_APPS += ['storages']
+
+# Backend de stockage des fichiers uploadés
+DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+
+AWS_ACCESS_KEY_ID = os.getenv("RENDER_OBJECT_STORAGE_ACCESS_KEY")
+AWS_SECRET_ACCESS_KEY = os.getenv("RENDER_OBJECT_STORAGE_SECRET_KEY")
+AWS_STORAGE_BUCKET_NAME = os.getenv("RENDER_OBJECT_STORAGE_BUCKET_NAME")
+AWS_S3_REGION_NAME = os.getenv("RENDER_OBJECT_STORAGE_REGION")
+
+AWS_QUERYSTRING_AUTH = False
+AWS_S3_FILE_OVERWRITE = False
+AWS_DEFAULT_ACL = None
+AWS_S3_SIGNATURE_VERSION = "s3v4"
+
+MEDIA_URL = f'https://{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/'
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
