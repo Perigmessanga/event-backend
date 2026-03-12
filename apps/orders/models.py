@@ -56,4 +56,11 @@ class Order(models.Model):
         """Vérifie la capacité avant création"""
         if self.ticket_type and self.quantity > self.ticket_type.available:
             raise ValidationError("Quantité demandée supérieure à la disponibilité.")
+        
+class OrderItem(models.Model):
+    order = models.ForeignKey(Order, related_name='items', on_delete=models.CASCADE)
+    event = models.ForeignKey('events.Event', on_delete=models.CASCADE)
+    ticket_type = models.ForeignKey('events.TicketType', on_delete=models.CASCADE, null=True, blank=True)
+    quantity = models.PositiveIntegerField()
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
             
