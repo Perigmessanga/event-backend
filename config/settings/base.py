@@ -160,10 +160,13 @@ AUTH_USER_MODEL = 'authentication.CustomUser'
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    "http://localhost:8080",
     "https://event-frontend-bay.vercel.app",
 ]
+CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:8080",
     "https://*.vercel.app",
     "https://*.onrender.com",
 ]
@@ -239,7 +242,7 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 AWDPAY_PRIVATE_KEY = os.getenv("AWDPAY_PRIVATE_KEY")
 AWDPAY_BASE_URL = os.getenv("AWDPAY_BASE_URL")
 #FRONTEND_URL = os.getenv("FRONTEND_URL")
-FRONTEND_URL= "https://event-frontend-bay.vercel.app/" # type: ignore
+FRONTEND_URL= "https://event-frontend-bay.vercel.app" # type: ignore
 BACKEND_URL = os.getenv(
     "BACKEND_URL",
     "https://event-backend-5-qoix.onrender.com"
