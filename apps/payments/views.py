@@ -1,48 +1,36 @@
+# payments/views.py
 from rest_framework import viewsets, permissions, status
-from rest_framework import response
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.db import transaction
 from .models import Payment
-from rest_framework import generics
-from .serializers import PaymentSerializer, AdminPaymentSerializer
-import requests
-from django.conf import settings
-
+from .serializers import PaymentSerializer
 from apps.orders.models import Order
+from apps.tickets.models import Ticket
+import requests
 import uuid
-
-from io import BytesIO
-from django.core.files import File
+from django.conf import settings
 from django.core.mail import EmailMessage
 from django.template.loader import render_to_string
-from django.db import transaction
-
-from rest_framework.response import Response
-from rest_framework import status
-from apps.tickets.models import Ticket
-
-from django.conf import settings
-import qrcode  # Assure-toi que qrcode est installé
+import qrcode  # type: ignore
 
 # =========================================
-# Payment ViewSet pour React
+# Payment ViewSet pour React + Mock
 # =========================================
 class PaymentViewSet(viewsets.ModelViewSet):
     serializer_class = PaymentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        # Admin voit tous les paiements, utilisateur seulement les siens
         user = self.request.user
         if user.is_staff:
             return Payment.objects.all()
         return Payment.objects.filter(order__user=user)
 
-    # =========================================
-    # Initiation du paiement (POST)
-    # =========================================
+    # -------------------------------
+    # Initiation du paiement réel
+    # -------------------------------
     @action(detail=False, methods=['post'], url_path='initiate')
     def initiate_payment(self, request):
         order_id = request.data.get('order_id')
@@ -57,25 +45,19 @@ class PaymentViewSet(viewsets.ModelViewSet):
         try:
             order = Order.objects.get(id=order_id, user=request.user)
         except Order.DoesNotExist:
-            return Response(
-                {"error": "Commande introuvable"},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"error": "Commande introuvable"}, status=status.HTTP_404_NOT_FOUND)
 
-        # 🔒 Vérifier si déjà payée
+        # Déjà payée ?
         if order.payment.filter(status='completed').exists():
-            return Response(
-                {"error": "Cette commande est déjà payée"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Cette commande est déjà payée"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 🔒 Vérifier si un paiement pending existe déjà
+        # Paiement pending existant ?
         existing_payment = order.payment.filter(status='pending').first()
         if existing_payment:
             serializer = PaymentSerializer(existing_payment)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
-        # 🔐 Création transactionnelle
+        # Création transactionnelle
         with transaction.atomic():
             payment = Payment.objects.create(
                 order=order,
@@ -85,11 +67,9 @@ class PaymentViewSet(viewsets.ModelViewSet):
                 status='pending'
             )
 
-            # =========================
             # Appel AWDPAY
-            # =========================
             payload = {
-                "logo": "https://tonsite.com/logo.png",
+                "logo": "https://app.awdpay.pro/AWDsvg.png",
                 "amount": float(order.total_price),
                 "currency": "XAF",
                 "customIdentifier": str(payment.transaction_id),
@@ -104,22 +84,34 @@ class PaymentViewSet(viewsets.ModelViewSet):
                 "Content-Type": "application/json"
             }
 
-            response = requests.post(
-                "https://www.awdpay.com/api/checkout/v2/initiate",
-                json=payload,
-                headers=headers
-            )
+            try:
+                response = requests.post(
+                    f"{settings.AWDPAY_BASE_URL}/initiate",
+                    json=payload,
+                    headers=headers,
+                    timeout=15
+                )
+                response.raise_for_status()
+                data = response.json()
+            except requests.exceptions.RequestException as e:
+                print("Erreur AWDPAY:", str(e))
+                return Response({"error": "Impossible de contacter AWDPAY."},
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-            data = response.json()
+            # Debug console
+            print("AWDPAY RAW RESPONSE:", response.text)
 
         return Response({
             "payment": PaymentSerializer(payment).data,
-            "awdpay": data
+            "awdpay": {
+                "checkoutUrl": data.get("checkout_url") or data.get("checkoutUrl") or None,
+                "transactionId": data.get("transaction_id") or data.get("transactionId") or str(payment.transaction_id)
+            }
         })
 
-    # =========================================
-    # Vérifier le statut d'un paiement
-    # =========================================
+    # -------------------------------
+    # Vérification du statut d'un paiement
+    # -------------------------------
     @action(detail=True, methods=['get'], url_path='status')
     def check_status(self, request, pk=None):
         try:
@@ -134,17 +126,35 @@ class PaymentViewSet(viewsets.ModelViewSet):
             "order_id": payment.order.id,
         })
 
+    # -------------------------------
+    # Endpoint Mock AWDPAY pour tests
+    # -------------------------------
+    @action(detail=False, methods=['post'], url_path='mock')
+    def mock_payment(self, request):
+        amount = request.data.get('amount')
+        currency = request.data.get('currency')
+        user_id = request.data.get('user_id')
+
+        if not all([amount, currency, user_id]):
+            return Response({"error": "amount, currency et user_id requis"},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({
+            "status": "success",
+            "transaction_id": str(uuid.uuid4()),
+            "amount": amount,
+            "currency": currency,
+            "user_id": user_id
+        })
+
 
 # =========================================
-# Webhook externe (AWDPAY ou autre prestataire)
+# Webhook AWDPAY pour prod
 # =========================================
-
-
 class PaymentWebhookView(APIView):
-    permission_classes = []  # ouvert au prestataire (AWDPAY)
+    permission_classes = []  # ouvert à AWDPAY
 
     def post(self, request):
-        data = request.data
         transaction_id = request.data.get("customIdentifier")
         status_tx = request.data.get("status")
 
@@ -163,8 +173,7 @@ class PaymentWebhookView(APIView):
 
                     tickets_files = []
 
-                    # 🔹 Génération automatique des tickets
-                    # On suppose que chaque "OrderItem" correspond à un ticket
+                    # Génération automatique des tickets
                     for item in payment.order.items.all():
                         ticket = Ticket.objects.create(
                             order=payment.order,
@@ -172,15 +181,12 @@ class PaymentWebhookView(APIView):
                             user=payment.order.user,
                             ticket_type=item.ticket_type
                         )
-
-                        # Le QR code est généré automatiquement dans Ticket.save()
-                        # Si tu veux récupérer l'image pour le PDF ou email
                         tickets_files.append(ticket.qr_code.path)
 
-                    # 🔹 Préparer l'email avec les tickets en PDF ou images
+                    # Email avec tickets
                     subject = f"Vos tickets pour la commande #{payment.order.id}"
                     message = render_to_string(
-                        'emails/tickets_email.html',  # crée ce template
+                        'emails/tickets_email.html',
                         {'user': payment.order.user, 'order': payment.order, 'tickets': tickets_files}
                     )
                     email = EmailMessage(
@@ -191,7 +197,6 @@ class PaymentWebhookView(APIView):
                     )
                     email.content_subtype = "html"
 
-                    # Attacher les fichiers QR si besoin
                     for qr_path in tickets_files:
                         with open(qr_path, 'rb') as f:
                             email.attach(f"{uuid.uuid4()}.png", f.read(), 'image/png')
@@ -208,4 +213,3 @@ class PaymentWebhookView(APIView):
             return Response({"error": "Paiement inconnu"}, status=404)
         except Exception as e:
             return Response({"error": str(e)}, status=500)
-

@@ -2,8 +2,11 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
+#
 
-
+# ================================
+# Django setup
+# ================================
 def main():
     """Run administrative tasks."""
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')

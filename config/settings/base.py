@@ -21,7 +21,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 # SECURITY
 # =====================================
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-this-in-production')
-DEBUG = False
+DEBUG = config("DEBUG", default=False, cast=bool)
 
 ALLOWED_HOSTS = config(
     'ALLOWED_HOSTS',
@@ -162,6 +162,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://localhost:8080",
     "https://event-frontend-bay.vercel.app",
+    "http://localhost:4173",
 ]
 CORS_ALLOW_CREDENTIALS = True
 
@@ -239,10 +240,10 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 
 
-AWDPAY_PRIVATE_KEY = os.getenv("AWDPAY_PRIVATE_KEY")
-AWDPAY_BASE_URL = os.getenv("AWDPAY_BASE_URL")
+AWDPAY_PRIVATE_KEY = os.getenv("AWDPAY_PRIVATE_KEY", default=None)
+AWDPAY_BASE_URL = os.getenv("AWDPAY_BASE_URL", default=None)
 #FRONTEND_URL = os.getenv("FRONTEND_URL")
-FRONTEND_URL= "https://event-frontend-bay.vercel.app" # type: ignore
+FRONTEND_URL = config("FRONTEND_URL") # type: ignore
 BACKEND_URL = os.getenv(
     "BACKEND_URL",
     "https://event-backend-5-qoix.onrender.com"
@@ -256,10 +257,12 @@ INSTALLED_APPS += ['storages']
 # Backend de stockage des fichiers uploadés
 DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
-AWS_ACCESS_KEY_ID = os.getenv("RENDER_OBJECT_STORAGE_ACCESS_KEY")
-AWS_SECRET_ACCESS_KEY = os.getenv("RENDER_OBJECT_STORAGE_SECRET_KEY")
-AWS_STORAGE_BUCKET_NAME = os.getenv("RENDER_OBJECT_STORAGE_BUCKET_NAME")
-AWS_S3_REGION_NAME = os.getenv("RENDER_OBJECT_STORAGE_REGION")
+AWS_ACCESS_KEY_ID = config("RENDER_OBJECT_STORAGE_ACCESS_KEY", default=None)
+AWS_SECRET_ACCESS_KEY = config("RENDER_OBJECT_STORAGE_SECRET_KEY", default=None)
+AWS_STORAGE_BUCKET_NAME = config("RENDER_OBJECT_STORAGE_BUCKET_NAME", default=None)
+AWS_S3_REGION_NAME = config("RENDER_OBJECT_STORAGE_REGION", default=None)
+AWS_S3_ADDRESSING_STYLE = "virtual"
+
 
 AWS_QUERYSTRING_AUTH = False
 AWS_S3_FILE_OVERWRITE = False
