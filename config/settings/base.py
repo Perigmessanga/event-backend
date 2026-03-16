@@ -25,7 +25,7 @@ DEBUG = config("DEBUG", default=False, cast=bool)
 
 ALLOWED_HOSTS = config(
     'ALLOWED_HOSTS',
-    default='.onrender.com,.vercel.app',
+    default='.onrender.com,.vercel.app,charles237.pythonanywhere.com',
     cast=lambda v: [s.strip() for s in v.split(',')]
 )
 
@@ -249,26 +249,29 @@ BACKEND_URL = os.getenv(
     "https://event-backend-5-qoix.onrender.com"
 )
 
+# Dossier local pour les fichiers médias
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # settings.py
 
-INSTALLED_APPS += ['storages']
+#INSTALLED_APPS += ['storages']
 
 # Backend de stockage des fichiers uploadés
-DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+#DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
-AWS_ACCESS_KEY_ID = config("RENDER_OBJECT_STORAGE_ACCESS_KEY", default=None)
-AWS_SECRET_ACCESS_KEY = config("RENDER_OBJECT_STORAGE_SECRET_KEY", default=None)
-AWS_STORAGE_BUCKET_NAME = config("RENDER_OBJECT_STORAGE_BUCKET_NAME", default=None)
-AWS_S3_REGION_NAME = config("RENDER_OBJECT_STORAGE_REGION", default=None)
-AWS_S3_ADDRESSING_STYLE = "virtual"
+#AWS_ACCESS_KEY_ID = config("RENDER_OBJECT_STORAGE_ACCESS_KEY", default=None)
+#AWS_SECRET_ACCESS_KEY = config("RENDER_OBJECT_STORAGE_SECRET_KEY", default=None)
+#AWS_STORAGE_BUCKET_NAME = config("RENDER_OBJECT_STORAGE_BUCKET_NAME", default=None)
+#AWS_S3_REGION_NAME = config("RENDER_OBJECT_STORAGE_REGION", default=None)
+#AWS_S3_ADDRESSING_STYLE = "virtual"
 
 
-AWS_QUERYSTRING_AUTH = False
-AWS_S3_FILE_OVERWRITE = False
-AWS_DEFAULT_ACL = None
-AWS_S3_SIGNATURE_VERSION = "s3v4"
+#AWS_QUERYSTRING_AUTH = False
+#AWS_S3_FILE_OVERWRITE = False
+#AWS_DEFAULT_ACL = None
+#AWS_S3_SIGNATURE_VERSION = "s3v4"
 
-MEDIA_URL = f'https://{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/'
+#MEDIA_URL = f'https://{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/'
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
