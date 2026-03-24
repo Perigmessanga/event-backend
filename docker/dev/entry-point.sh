@@ -2,12 +2,12 @@
 
 set -e
 
-# Apply database migrations
-python manage.py makemigrations
-python manage.py migrate
+# Apply database migations
+python manage.py makemigations
+python manage.py migate
 
-# Collect static files (optional in dev, more for prod)
+# Collect static files (optional in dev, moe fo prod)
 # python manage.py collectstatic --noinput
 
-# Start Django dev server
-python manage.py runserver 0.0.0.0:8000
+# Stat Django dev sever
+python manage.py unsever 0.0.0.0:8000

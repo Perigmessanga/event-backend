@@ -1,44 +1,37 @@
 services:
   web:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-      args:
-        REQUIREMENTS_FILE: requirements/production.txt   # install dev deps
-    container_name: event_api_dev
-    # command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
-    command: ["/app/docker/dev/entry-point.sh"]
-    volumes:
-      - .:/app
+    image: ${IMAGE_NAME}
+    container_name: event_api_prod
+    command: sh -c "python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120 --access-logfile - --error-logfile -"
     ports:
       - "8000:8000"
     env_file:
       - .env.prod
     depends_on:
-      - mysql
-
-  mysql:
-    image: mysql:8.0
-    container_name: even_mysql
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     restart: always
-    environment:
-      MYSQL_DATABASE: events_db
-      MYSQL_USER: events_user
-      MYSQL_PASSWORD: events_password
-      MYSQL_ROOT_PASSWORD: root_password
-    ports:
-      - "3307:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
 
-  
+  postgres:
+    image: postgres:15-alpine
+    container_name: event_postgres_prod
+    restart: always
+    env_file:
+      - .env.prod
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   redis:
     image: redis:7-alpine
-    container_name: event_redis
+    container_name: event_redis_prod
     restart: always
-    ports:
-      - "6380:6379"
-
 
 volumes:
-  mysql_data:
+  pgdata_prod:

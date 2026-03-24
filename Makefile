@@ -2,16 +2,14 @@
 # Global config
 # ==============================
 
-PROJECT_NAME := event api
+PROJECT_NAME := event-api
 ENV ?= dev
 
-COMPOSE := docker compose
+COMPOSE      := docker compose
 COMPOSE_FILE := compose.$(ENV).yml
-ENV_FILE := .env.$(ENV)
+ENV_FILE     := .env.$(ENV)
 
-DJANGO := django
-# CELERY := celery
-# CELERY_BEAT := celery-beat
+DJANGO       := web
 
 .DEFAULT_GOAL := help
 
@@ -51,6 +49,9 @@ restart:
 logs:
 	$(COMPOSE) -f $(COMPOSE_FILE) logs -f
 
+logs-web:
+	$(COMPOSE) -f $(COMPOSE_FILE) logs -f $(DJANGO)
+
 ps:
 	$(COMPOSE) -f $(COMPOSE_FILE) ps
 
@@ -60,9 +61,6 @@ ps:
 
 shell:
 	$(COMPOSE) -f $(COMPOSE_FILE) exec $(DJANGO) python manage.py shell
-
-runserver:
-	$(COMPOSE) -f $(COMPOSE_FILE) exec $(DJANGO) python manage.py runserver 0.0.0.0:8000
 
 migrate:
 	$(COMPOSE) -f $(COMPOSE_FILE) exec $(DJANGO) python manage.py migrate
@@ -80,24 +78,14 @@ test:
 	$(COMPOSE) -f $(COMPOSE_FILE) exec $(DJANGO) python manage.py test
 
 # ==============================
-# Celery
-# ==============================
-
-# celery-logs:
-# 	$(COMPOSE) -f $(COMPOSE_FILE) logs -f $(CELERY)
-
-# beat-logs:
-# 	$(COMPOSE) -f $(COMPOSE_FILE) logs -f $(CELERY_BEAT)
-
-# celery-shell:
-# 	$(COMPOSE) -f $(COMPOSE_FILE) exec $(CELERY) sh
-
-# ==============================
 # Database
 # ==============================
 
 db-shell:
-	$(COMPOSE) -f $(COMPOSE_FILE) exec postgres psql -U $$DB_USER -d $$DB_NAME
+	$(COMPOSE) -f $(COMPOSE_FILE) exec postgres psql -U $${POSTGRES_USER} -d $${POSTGRES_DB}
+
+db-backup:
+	$(COMPOSE) -f $(COMPOSE_FILE) exec postgres pg_dump -U $${POSTGRES_USER} $${POSTGRES_DB} > backup_$$(date +%Y%m%d_%H%M%S).sql
 
 # ==============================
 # Maintenance
@@ -110,7 +98,8 @@ clean: guard-prod
 reset: guard-prod
 	$(MAKE) down-v
 	$(MAKE) build
-	$(MAKE) up
+	$(MAKE) up-d
+	$(MAKE) migrate
 
 # ==============================
 # Help
@@ -119,17 +108,30 @@ reset: guard-prod
 help:
 	@echo ""
 	@echo "Usage:"
-	@echo "  make <command> ENV=dev|test|prod"
+	@echo "  make <command> ENV=dev|prod"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make up ENV=dev"
-	@echo "  make test ENV=test"
+	@echo "  make migrate ENV=dev"
 	@echo "  make build ENV=prod"
 	@echo ""
 	@echo "Commands:"
-	@echo "  build, up, up-d, down, restart, logs, ps"
-	@echo "  migrate, makemigrations, superuser, test"
-# 	@echo "  celery-logs, beat-logs"
-	@echo "  db-shell"
-	@echo "  clean, reset"
+	@echo "  build          Build les images Docker"
+	@echo "  up             Démarrer les containers (foreground)"
+	@echo "  up-d           Démarrer les containers (background)"
+	@echo "  down           Arrêter les containers"
+	@echo "  down-v         Arrêter + supprimer volumes (bloqué en prod)"
+	@echo "  restart        Redémarrer"
+	@echo "  logs           Logs de tous les containers"
+	@echo "  logs-web       Logs du container Django"
+	@echo "  ps             Status des containers"
+	@echo "  migrate        Lancer les migrations"
+	@echo "  makemigrations Créer les migrations"
+	@echo "  superuser      Créer un superutilisateur"
+	@echo "  collectstatic  Collecter les fichiers statiques"
+	@echo "  test           Lancer les tests"
+	@echo "  db-shell       Shell Postgres"
+	@echo "  db-backup      Backup de la base de données"
+	@echo "  clean          Nettoyer tout (bloqué en prod)"
+	@echo "  reset          Reset complet (bloqué en prod)"
 	@echo ""

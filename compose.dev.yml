@@ -4,10 +4,9 @@ services:
       context: .
       dockerfile: docker/Dockerfile
       args:
-        REQUIREMENTS_FILE: requirements/development.txt   # install dev deps
+        REQUIREMENTS_FILE: requirements/development.txt
     container_name: event_api_dev
-    # command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
-    command: ["/app/docker/dev/entry-point.sh"]
+    command: sh -c "sleep 5; python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
     volumes:
       - .:/app
     ports:
@@ -15,41 +14,47 @@ services:
     env_file:
       - .env.dev
     depends_on:
-      - mysql
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
-  mysql:
-    image: mysql:8.0
-    container_name: even_mysql
+  postgres:
+    image: postgres:15-alpine
+    container_name: event_postgres
     restart: always
-    environment:
-      MYSQL_DATABASE: events_db
-      MYSQL_USER: events_user
-      MYSQL_PASSWORD: events_password
-      MYSQL_ROOT_PASSWORD: root_password
+    env_file:
+      - .env
     ports:
-      - "3307:3306"
+      - "5435:5432"
     volumes:
-      - mysql_data:/var/lib/mysql
+      - pgdata_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U events_user -d events_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-  phpmyadmin:
-    image: phpmyadmin/phpmyadmin
-    container_name: event_phpmyadmin
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: event_pgadmin
     restart: always
-    environment:
-      PMA_HOST: mysql
-      PMA_USER: event
-      PMA_PASSWORD: events_password
+    env_file:
+      - .env
     ports:
-      - "4000:80"
+      - "8085:80"
     depends_on:
-      - mysql
+      - postgres
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
   redis:
-    image: redis:7-alpine
+    image: redis:latest
     container_name: event_redis
     restart: always
     ports:
       - "6380:6379"
 
-
 volumes:
-  mysql_data:
+  pgdata_dev:
+  pgadmin_data:
