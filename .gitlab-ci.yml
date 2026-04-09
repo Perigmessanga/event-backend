@@ -1,0 +1,30 @@
+stages:
+  - deploy
+
+variables:
+  SERVER_IP: "78.138.58.107"
+  SERVER_USER: "root"
+  PROJECT_DIR: "/root/event-backend"
+
+before_script:
+  - apt-get update -y && apt-get install -y openssh-client
+
+deploy:
+  stage: deploy
+  only:
+    - main
+  script:
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan -H $SERVER_IP >> ~/.ssh/known_hosts
+
+    # Déploiement
+    - |
+      ssh $SERVER_USER@$SERVER_IP "
+        cd $PROJECT_DIR &&
+        git pull &&
+        docker-compose -f compose.prod.yml down &&
+        docker-compose -f compose.prod.yml build --no-cache &&
+        docker-compose -f compose.prod.yml up -d
+      "

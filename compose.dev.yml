@@ -24,7 +24,7 @@ services:
     container_name: event_postgres
     restart: always
     env_file:
-      - .env
+      - .env.dev
     ports:
       - "5435:5432"
     volumes:
@@ -40,7 +40,7 @@ services:
     container_name: event_pgadmin
     restart: always
     env_file:
-      - .env
+      - .env.dev
     ports:
       - "8085:80"
     depends_on:
