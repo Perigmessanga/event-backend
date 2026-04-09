@@ -17,7 +17,7 @@ RUN apt-get update && \
 
 # Copier requirements et installer prod
 COPY requirements /app/requirements
-ARG REQUIREMENTS_FILE=requirements/prod.txt
+ARG REQUIREMENTS_FILE=requirements/production.txt
 RUN pip install --no-cache-dir -r ${REQUIREMENTS_FILE}
 
 # Copier le code
