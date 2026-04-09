@@ -108,6 +108,20 @@ class EventCreateUpdateSerializer(serializers.ModelSerializer):
         read_only_fields = ['organizer']
 
     # --------------------------
+    # PARSING
+    # --------------------------
+    def to_internal_value(self, data):
+        # Permet de parser le JSON envoyé via FormData pour les ticketTypes
+        if 'ticketTypes' in data and isinstance(data['ticketTypes'], str):
+            try:
+                import json
+                data = data.copy()
+                data['ticketTypes'] = json.loads(data['ticketTypes'])
+            except (ValueError, TypeError):
+                pass
+        return super().to_internal_value(data)
+
+    # --------------------------
     # VALIDATION
     # --------------------------
     def validate(self, data):
