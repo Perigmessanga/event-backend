@@ -17,6 +17,7 @@ from .serializers import (
     EventListSerializer,
     EventDetailSerializer,
     EventCreateUpdateSerializer,
+    EventPublicDetailSerializer,
     AdminTicketTypeSerializer
 )
 from apps.orders.models import Order
@@ -149,7 +150,8 @@ class EventViewSet(viewsets.ModelViewSet):
         event = self.get_object()
         if event.status != 'published':
             return Response({'error': "Cet événement n'est pas disponible."}, status=status.HTTP_403_FORBIDDEN)
-        serializer = EventDetailSerializer(event, context={'request': request})
+        # ✅ Utilisation du sérialiseur public spécifique
+        serializer = EventPublicDetailSerializer(event, context={'request': request})
         return Response({
             'event': serializer.data,
             'tickets_available': event.get_available_tickets(),

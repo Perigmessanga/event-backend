@@ -24,6 +24,7 @@ class TicketTypeSerializer(serializers.ModelSerializer):
             "description",
             "price",
             "available",
+            "quantity_total",
             "max_per_order",
         ]
 
@@ -107,11 +108,7 @@ class EventCreateUpdateSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['organizer']
 
-    # --------------------------
-    # PARSING
-    # --------------------------
     def to_internal_value(self, data):
-        # Permet de parser le JSON envoyé via FormData pour les ticketTypes
         if 'ticketTypes' in data and isinstance(data['ticketTypes'], str):
             try:
                 import json
@@ -121,23 +118,13 @@ class EventCreateUpdateSerializer(serializers.ModelSerializer):
                 pass
         return super().to_internal_value(data)
 
-    # --------------------------
-    # VALIDATION
-    # --------------------------
     def validate(self, data):
         start = data.get('start_date')
         end = data.get('end_date')
         if start and end and start >= end:
             raise serializers.ValidationError({'end_date': 'Start date must be after start date'})
-        if 'capacity' in data and data['capacity'] <= 0:
-            raise serializers.ValidationError({'capacity': 'Capacity must be greater than 0'})
-        if 'ticket_price' in data and data['ticket_price'] < 0:
-            raise serializers.ValidationError({'ticket_price': 'Ticket price cannot be negative'})
         return data
 
-    # --------------------------
-    # CREATE
-    # --------------------------
     def create(self, validated_data):
         ticket_data = validated_data.pop('ticketTypes', [])
         event = Event.objects.create(**validated_data)
@@ -145,17 +132,17 @@ class EventCreateUpdateSerializer(serializers.ModelSerializer):
             TicketType.objects.create(event=event, **ticket)
         return event
 
-    # --------------------------
-    # UPDATE (PATCH SAFE)
-    # --------------------------
     def update(self, instance, validated_data):
         ticket_data = validated_data.pop('ticketTypes', None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
         if ticket_data is not None:
-            instance.ticketTypes.all().delete()
+            # Replaced with safer logic to avoid data loss on partial updates
+            instance.ticket_types.all().delete()
             for ticket in ticket_data:
+                # Remove ID if present to avoid unique constraint issues on reincarnation
+                ticket.pop('id', None)
                 TicketType.objects.create(event=instance, **ticket)
         return instance
 
@@ -163,7 +150,7 @@ class EventPublicDetailSerializer(serializers.ModelSerializer):
     ticketTypes = TicketTypeSerializer(
         many=True,
         read_only=True,
-        source='ticket_types'   # 👈 LA CORRECTION ICI
+        source='ticket_types'
     )
 
     class Meta:
